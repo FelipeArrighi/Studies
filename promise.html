@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Promise Control</title>
+</head>
+
+<body>
+  <h1>Throttling number of promises</h1>
+  <p>Open the browser console to see the Promise output.</p>
+  <button onclick="controller.pause()">pause</button>
+  <button onclick="controller.resume()">resume</button>
+  <button onclick="controller.abort()">abort</button>
+  <script>
+
+    var promises = [];
+
+    for (let i = 0; i < 50; i++) {
+
+      let promise = () => new Promise((resolve, reject) => {
+
+        setTimeout(() => {
+          resolve(i);
+        }
+          , Math.random() * 1000);
+      });
+
+      promises.push(promise);
+    }
+
+
+
+    function promiseController(arrayOfPromises, limit) {
+      let index = 0;
+      let executing = 0;
+      let paused = false;
+      let aborted = false;
+      const results = new Array(arrayOfPromises.length);
+
+      function abort() {
+        aborted = true;
+      }
+
+      function pause() {
+        paused = true;
+      }
+
+      function resume(resolve) {
+        paused = false;
+        next(resolve, undefined, results.slice());
+      }
+
+      function next(resolve = () => { }, reject = () => { }, parcialResults = []) {
+        if (paused) {
+          console.log("Waiting...");
+          return;
+        }
+
+        if (aborted) {
+          console.log("Execution aborted!");
+          resolve(parcialResults);
+          return;
+        }
+
+        while (executing < limit && index < arrayOfPromises.length) {
+          executing++;
+          const i = index++;
+          arrayOfPromises[i]()
+            .then((result) => {
+              console.log(`Result: ${result}`);
+              results[i] = result;
+            })
+            .catch((erro) => {
+              console.error(erro);
+              results[i] = `Error: ${erro}`
+            })
+            .finally(() => {
+              executing--;
+              next(resolve, reject, results.slice());
+            });
+        }
+
+        if (executing === 0) {
+          resolve(results);
+        }
+      }
+
+      return {
+        abort,
+        pause,
+        resume,
+        start: () => {
+          return new Promise((resolve, reject) => {
+            next(resolve, reject, []);
+          });
+        },
+      };
+    }
+
+    const controller = promiseController(promises, 4);
+
+    controller.start().then((result) => {
+      
+      console.log("Results:", result);
+
+    }).catch((erro) => {
+      console.error(erro);
+    });
+
+
+  </script>
+</body>
+
+</html>
